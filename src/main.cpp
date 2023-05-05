@@ -18,7 +18,7 @@ constexpr short port = 1234;
 class program_options{
     public:
         bool run_server = false;
-        log_level log_level = log_level::default_level;
+        helpers::log_level log_level = helpers::log_level::default_level;
 
         program_options(int argc, char *argv[])
         {
@@ -57,11 +57,11 @@ class server_factory{
 };
 std::vector<std::weak_ptr<network::server>> server_factory::all_servers_;
 
-logger create_logger(const program_options &options){
-    auto log = logger::get_logger();
-    log.set_level(options.log_level);
-    return log;
-}
+// logger create_logger(const program_options &options){
+//     auto log = logger::get_logger();
+//     log.set_level(options.log_level);
+//     return log;
+// }
 
 class program{
     public:
@@ -142,7 +142,9 @@ class program{
 int main(int argc, char *argv[])
 {
     program_options options{argc, argv};
-    auto log = create_logger(options);
+    //auto log = create_logger(options);
+    auto log = logger::get_logger();
+    log.set_level(options.log_level);
     log.write(log_level::debug, "Starting up");
 
     auto log_messages = [log]() mutable {

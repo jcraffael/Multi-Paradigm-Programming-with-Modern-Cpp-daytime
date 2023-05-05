@@ -4,13 +4,16 @@
 #include <thread>
 #include <queue>
 #include <iostream>
+#include <condition_variable>
+#include <mutex>
 
-namespace helpers{
+namespace helpers
+{
     //! Convert log level into string
-    static std::string string_from_log_level(log_level level){
+    static std::string string_from_log_level(log_level level)
+    {
         const char *names[] = {
-            "OFF", "ERROR", "WARNING", "INFO", "DEBUG"
-        };
+            "OFF", "ERROR", "WARNING", "INFO", "DEBUG"};
         auto ilevel = static_cast<int>(level);
         if (ilevel < 0 || level >= log_level::_last)
             ilevel = 0; // avoid overrun
@@ -18,7 +21,8 @@ namespace helpers{
     }
 
     //! Get current time, for printing into the log
-    static std::string get_now_string(){
+    static std::string get_now_string()
+    {
         using system_clock = std::chrono::system_clock;
         auto now = system_clock::now();
         auto cnow = system_clock::to_time_t(now);
@@ -33,7 +37,8 @@ namespace helpers{
 using namespace helpers;
 
 //! Logger implementation
-struct logger::logger_impl{
+struct logger::logger_impl
+{
     log_level level = log_level::default_level;
     std::ofstream stream;
 
@@ -45,14 +50,16 @@ struct logger::logger_impl{
     std::condition_variable message_pending;
 
     logger_impl()
-        : writer_thread([this](){
+        : writer_thread([this]()
+                        {
             while (active.load(std::memory_order_relaxed)){
                 write_pending_message();
-            }
-        }){
+            } })
+    {
     }
 
-    ~logger_impl(){
+    ~logger_impl()
+    {
         active.store(false, std::memory_order_relaxed);
         std::scoped_lock lock{mutex};
         message_pending.notify_one();
@@ -60,31 +67,34 @@ struct logger::logger_impl{
         writer_thread.join();
     }
 
-    void write_pending_message(){
+    void write_pending_message()
+    {
 
-        std::unique_lock lock {mutex};
+        std::unique_lock lock{mutex};
         message_pending.wait(lock); // releases the mutex
         // mutex is acquired
 
         if (messages.empty())
             return;
-        
-        std::queue<std::string> taken_messages { std::move(messages) };
+
+        std::queue<std::string> taken_messages{std::move(messages)};
         lock.unlock();
 
         std::cout << "Taken " << taken_messages.size() << " messages" << std::endl;
 
-        while (!taken_messages.empty()){
+        while (!taken_messages.empty())
+        {
 
             std::string m{std::move(taken_messages.front())};
             taken_messages.pop();
 
             stream << m << std::endl;
-            //std::cout << m << std::endl;
+            // std::cout << m << std::endl;
         }
     }
 
-    void push_message(log_level level, const std::string &message){
+    void push_message(log_level level, const std::string &message)
+    {
         std::stringstream stream;
         stream
             << "["
@@ -103,12 +113,15 @@ struct logger::logger_impl{
 };
 
 //! Get logger singleton. Throws if log cannot be accessed
-logger logger::get_logger(){
+logger logger::get_logger()
+{
     static logger singleton;
-    if (!singleton.impl_){
+    if (!singleton.impl_)
+    {
         auto impl = std::make_shared<logger::logger_impl>();
         impl->stream.open("log.txt", std::ios_base::app);
-        if (!impl->stream.is_open()){
+        if (!impl->stream.is_open())
+        {
             throw std::runtime_error{"Cannot open a log"};
         }
         singleton.impl_ = impl;
@@ -121,22 +134,25 @@ logger logger::get_logger(){
 // Message is const&:
 //      Caller gets a guarantee that the string won't change
 
-void logger::write(log_level level, const std::string &message) const {
+void logger::write(log_level level, const std::string &message) const
+{
 
     assert(impl_);
 
     if (level > impl_->level)
         return;
-    
+
     impl_->push_message(level, message);
 }
 
-log_level logger::get_level() const {
+log_level logger::get_level() const
+{
     assert(impl_);
     return impl_->level;
 }
 
-void logger::set_level(log_level level) {
+void logger::set_level(log_level level)
+{
     assert(impl_);
     impl_->level = level;
 }
